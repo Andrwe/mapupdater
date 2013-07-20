@@ -75,6 +75,14 @@
     Return $winShell.namespace($tofile).MoveHere($fromFile,$FOF_RESPOND_YES)
  EndFunc
  
+ Func _generateString($sLine, $aReplaces)
+	Local $i
+	for $i = 0 To UBound($aReplaces) -1
+	   $sLine = StringRegExpReplace($sLine, '%' & $i & '%', $aReplaces[$i])
+	Next
+	Return $sLine
+ EndFunc
+ 
  Func _addStatusText($StatusEdit, $sText)
 	GUICtrlSetData($StatusEdit, GUICtrlRead($StatusEdit) & '- ' & $sText & @CRLF)
  EndFunc
@@ -93,39 +101,39 @@
     GUICtrlSetData($StatusProgress, 1)
 	$sUrl = $sUrl & $sFile
 	_addStatusText($StatusEdit, 'Lade Datei ' & $sUrl & ' nach ' & @TempDir)
-	   $download = InetGet($sUrl, @TempDir & "\" & $sFile, 2, 1)
-	   $dlSize = InetGetSize($sUrl, 2)
-	   Do
-		  If GUIGetMsg() == $EndButton Or GUIGetMsg() == $GUI_EVENT_CLOSE Then
-			 InetClose($download)
-			 FileDelete(@TempDir & "\" & $sFile)
-			 GUICtrlSetData($StatusProgress, 0)
-			 GUICtrlSetData($StatusLabel, '')
-			 GUICtrlSetData($EndButton, 'Beenden')
-			 Return 1
-		  EndIf
-		  $dlDone = InetGetInfo($download, 0)
-		  $dlRateOld = $dlRate
-		  $dlRate = Floor((($dlDone - $dlDoneOld) * 10 / 1024))
-		  If $dlRate < 1 Then $dlRate = $dlRateOld
-		  GUICtrlSetData($StatusLabel, 'Datei-Größe (MB):' & @TAB & Floor(($dlSize / 1024 / 1024)) & @TAB & 'ca. Restzeit (Min): ' & @TAB & Floor($dlSize / 1024 / $dlRate / 60) & @CRLF & 'davon geladen (MB):' & @TAB & Floor(($dlDone / 1024 / 1024)) & @TAB & 'Download-Rate (KB/s): ' & @TAB & $dlRate)
-		  GUICtrlSetData($StatusProgress, ($dlDone * 100 / $dlSize))
-		  $dlDoneOld = $dlDone
-		  Sleep(100)
-	   Until InetGetInfo($download, 2)
-	   If InetGetInfo($download, 3) Then
-		  GUICtrlSetData($StatusProgress, 100)
-		  Return 1
-	   Else
-		  _addStatusText($StatusEdit, 'Beim herunterladen von ' & $aUrl & ' ist folgender Fehler aufgetreten:' & @CRLF & InetGetInfo($download, 4)
+	$download = InetGet($sUrl, @TempDir & "\" & $sFile, 2, 1)
+	$dlSize = InetGetSize($sUrl, 2)
+	Do
+	   If GUIGetMsg() == $EndButton Or GUIGetMsg() == $GUI_EVENT_CLOSE Then
+		  InetClose($download)
+		  FileDelete(@TempDir & "\" & $sFile)
+		  GUICtrlSetData($StatusProgress, 0)
+		  GUICtrlSetData($StatusLabel, '')
+		  GUICtrlSetData($EndButton, 'Beenden')
 		  Return 0
 	   EndIf
+	   $dlDone = InetGetInfo($download, 0)
+	   $dlRateOld = $dlRate
+	   $dlRate = Floor((($dlDone - $dlDoneOld) * 10 / 1024))
+	   If $dlRate < 10 Then $dlRate = $dlRateOld
+	   GUICtrlSetData($StatusLabel, 'Datei-Größe (MB):' & @TAB & Floor(($dlSize / 1024 / 1024)) & @TAB & 'ca. Restzeit (Min): ' & @TAB & Floor($dlSize / 1024 / $dlRate / 60) & @CRLF & 'davon geladen (MB):' & @TAB & Floor(($dlDone / 1024 / 1024)) & @TAB & 'Download-Rate (KB/s): ' & @TAB & $dlRate)
+	   GUICtrlSetData($StatusProgress, ($dlDone * 100 / $dlSize))
+	   $dlDoneOld = $dlDone
+	   Sleep(100)
+	Until InetGetInfo($download, 2)
+	If InetGetInfo($download, 3) Then
+	   GUICtrlSetData($StatusProgress, 100)
+	   Return 1
+	Else
+	   _addStatusText($StatusEdit, 'Beim herunterladen von ' & $aUrl & ' ist folgender Fehler aufgetreten:' & @CRLF & InetGetInfo($download, 4)
+	   Return 0
+	EndIf
  EndFunc
  
  Func _getFiles($WinMain, $StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
 	Local $WinError, $Label, $TextArea, $sNewFile, $sNewFilePath, $sFile, $sFilePath, $dlReturn = 1, $sUrl = "http://osm.pleiades.uni-wuppertal.de/openfietsmap/EU_2013/GPS/"   ; <------- Change if you want to try it
 	Local $WinCardSel, $i, $lvItem, $aItem
-	Local $aFiles, $aLvItems, $aLines
+	Local $aFiles, $aLvItems, $aLines, $aImages
 	_addStatusText($StatusEdit, 'Ermittle Datei-URLs')
 	Local $bData = InetRead($sUrl)
 	Dim $aContent = StringRegExp(BinaryToString($bData), '(?i).*a\shref="([^"]*\.zip)".*<td[^>]*>([^<]*)</td><td[^<]*>[^<]*</td><td[^>]*><?b?>?([^<]*)<.*', 3)
@@ -166,8 +174,7 @@
 	   EndSwitch
 	WEnd
 	GUIDelete($WinCardSel)
-	
-	Dim $aImages[UBound($aFiles)]
+
 	_addStatusText($StatusEdit, 'Lade und installiere ' & UBound($aFiles) & ' Karte(n).')
 	
 	if not IsArray($aFiles) Then
@@ -203,10 +210,10 @@
 		  If _unzipFiles($StatusEdit, $EndButton, $sFilePath, $sNewFilePath) Then
 			 _addStatusText($StatusEdit, 'Lösche erfolgreich entpackte Datei ' & $sFilePath)
 			 FileDelete($sFilePath)
-			 _ArrayAdd($aImages, $sNewFilePath)
+			 _addElement($aImages, $sNewFilePath)
 		  EndIf
 	   ElseIf $dlReturn == 2 Then
-		  _ArrayAdd($aImages, $sNewFilePath)
+		  _addElement($aImages, $sNewFilePath)
 	   EndIf
     Next
 	GUICtrlSetData($StatusLabel, '')
@@ -301,7 +308,7 @@
 			 Case $GUI_EVENT_CLOSE
 				ExitLoop
 			 Case $StartButton
-				while not _isInternetConnected()
+				While Not _isInternetConnected()
 				   GUISetState(@SW_DISABLE, $WinMain)
 				   Switch MsgBox( 6, "keine Internetverbindung", "Der Rechner scheint keine Netzwerkverbindung zu haben. Bitte zu erst ein Verbindung herstellen.")
 					  Case 2
@@ -324,10 +331,13 @@
 					  EndIf
 					  For $sImage In $aImages
 						 If Not $sImage Then ContinueLoop
+;~ 						 $sFileSize = FileGetSize($sImage)
+;~ 						 $sTarget
 						 _addStatusText($StatusEdit, 'Verschiebe ' & $sImage & ' nach ' & $sTargetDir)
-						 If Not _moveFile($sImage, $sTargetDir) Then
-							_addStatusText($StatusEdit, 'Fehler beim Verschieben der Karte auf das Gerät. Fehler-Code: ' & @error)
-						 EndIf
+						 _moveFile($sImage, $sTargetDir)
+;~ 						 If $sFileSize == 
+;~ 							_addStatusText($StatusEdit, 'Fehler beim Verschieben der Karte auf das Gerät. Fehler-Code: ' & @error)
+;~ 						 EndIf
 					  Next
 					  _addStatusText($StatusEdit, 'Kartenupdate abgeschlossen.')
 				   EndIf
