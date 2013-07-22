@@ -59,8 +59,9 @@
 ; Description....:  move given file to target directory using Windows API with progress bar
 ; Syntax.........:  _moveFile($fromFile, $toFile)
 ; Parameters.....:  
-; Return values..:  Success     - 1
-;                   Failure     - 0
+; Return values..:  Success          - 1
+;                   Unknown Language - 0
+;                   Failure          - 0
 ; Author.........:  Andrwe Lord Weber
 ; Credits:.......:  Jos (http://www.autoitscript.com/forum/user/19-jos) for original idea (_FileCopy)
 ; Modified.......:  
@@ -75,12 +76,69 @@
     Return $winShell.namespace($tofile).MoveHere($fromFile,$FOF_RESPOND_YES)
  EndFunc
  
+ ; #FUNCTION# ====================================================================================================
+; Name...........:  _getLanguage
+; Description....:  returns language code according to ISO 639-3 used in lang.ini
+; Syntax.........:  _getLanguage()
+; Parameters.....:  
+; Return values..:  Success     - language code
+;                   Failure     - 0
+; Author.........:  Andrwe Lord Weber
+; Credits:.......:  http://www.autoitscript.com/autoit3/docs/appendix/OSLangCodes.htm
+; Modified.......:  
+; Remarks........:  
+; Related........:  http://www-01.sil.org/iso639%2D3/codes.asp
+; Link...........:  http://www.autoitscript.com/autoit3/docs/appendix/OSLangCodes.htm
+; Example........:
+; ===============================================================================================================
+ Func _getLanguage()
+    Select
+	   Case StringInStr("0413 0813", @OSLang)
+		   ; Dutch
+		   Return 0
+	   Case StringInStr("0409 0809 0c09 1009 1409 1809 1c09 2009 2409 2809 2c09 3009 3409", @OSLang)
+		   ; English
+		   Return "deu"
+		   Return "eng"
+	   Case StringInStr("040c 080c 0c0c 100c 140c 180c", @OSLang)
+		   ; French
+		   Return 0
+	   Case StringInStr("0407 0807 0c07 1007 1407", @OSLang)
+		   ; German
+		   Return "deu"
+	   Case StringInStr("0410 0810", @OSLang)
+		   ; Italian
+		   Return 0
+	   Case StringInStr("0414 0814", @OSLang)
+		   ; Norwegian
+		   Return 0
+	   Case StringInStr("0415", @OSLang)
+		   ; Polish
+		   Return 0
+	   Case StringInStr("0416 0816", @OSLang)
+		   ; Portuguese
+		   Return 0
+	   Case StringInStr("040a 080a 0c0a 100a 140a 180a 1c0a 200a 240a 280a 2c0a 300a 340a 380a 3c0a 400a 440a 480a 4c0a 500a", @OSLang)
+		   ; Spanish
+		   Return 0
+	   Case StringInStr("041d 081d", @OSLang)
+		   ; Swedish
+		   Return 0
+	   Case Else
+		   Return 0
+    EndSelect
+ EndFunc
+ 
  Func _generateString($sLine, $aReplaces)
 	Local $i
 	for $i = 0 To UBound($aReplaces) -1
-	   $sLine = StringRegExpReplace($sLine, '%' & $i & '%', $aReplaces[$i])
+	   $sLine = StringReplace($sLine, '%' & $i & '%', $aReplaces[$i])
 	Next
 	Return $sLine
+ EndFunc
+ 
+ Func _getString($sSection, $sKey, $aReplaces = '')
+	Return _generateString(IniRead(@ScriptDir & '\lang.ini', $sSection & '/' & _getLanguage(), $sKey, IniRead(@ScriptDir & '\lang.ini', $sSection & '/eng', $sKey, '')), $aReplaces)
  EndFunc
  
  Func _addStatusText($StatusEdit, $sText)
@@ -97,10 +155,10 @@
  
  Func _loadFile($StatusEdit, $StatusProgress, $StatusLabel, $EndButton, $sUrl, $sFile)
 	Local $download, $dlSize = 2000000000, $dlDone = 0, $dlDoneOld = 0, $dlRate = 1, $dlRateOld
-	GUICtrlSetData($EndButton, 'Download stoppen')
+	GUICtrlSetData($EndButton, _getString('button', 'btnStopDownload'))
     GUICtrlSetData($StatusProgress, 1)
 	$sUrl = $sUrl & $sFile
-	_addStatusText($StatusEdit, 'Lade Datei ' & $sUrl & ' nach ' & @TempDir)
+	_addStatusText($StatusEdit, _getString('info', 'infDownloadFile', _ArrayCreate($sUrl, @TempDir)))
 	$download = InetGet($sUrl, @TempDir & "\" & $sFile, 2, 1)
 	$dlSize = InetGetSize($sUrl, 2)
 	Do
@@ -109,14 +167,14 @@
 		  FileDelete(@TempDir & "\" & $sFile)
 		  GUICtrlSetData($StatusProgress, 0)
 		  GUICtrlSetData($StatusLabel, '')
-		  GUICtrlSetData($EndButton, 'Beenden')
+		  GUICtrlSetData($EndButton, _getString('button', 'btnClose'))
 		  Return 0
 	   EndIf
 	   $dlDone = InetGetInfo($download, 0)
 	   $dlRateOld = $dlRate
 	   $dlRate = Floor((($dlDone - $dlDoneOld) * 10 / 1024))
 	   If $dlRate < 10 Then $dlRate = $dlRateOld
-	   GUICtrlSetData($StatusLabel, 'Datei-Größe (MB):' & @TAB & Floor(($dlSize / 1024 / 1024)) & @TAB & 'ca. Restzeit (Min): ' & @TAB & Floor($dlSize / 1024 / $dlRate / 60) & @CRLF & 'davon geladen (MB):' & @TAB & Floor(($dlDone / 1024 / 1024)) & @TAB & 'Download-Rate (KB/s): ' & @TAB & $dlRate)
+	   GUICtrlSetData($StatusLabel, _getString('info', 'infDownloadStatus', _ArrayCreate(@TAB & Floor(($dlSize / 1024 / 1024)) & @TAB, @TAB & Floor($dlSize / 1024 / $dlRate / 60) & @CRLF, @TAB & Floor(($dlDone / 1024 / 1024)) & @TAB, @TAB & $dlRate)))
 	   GUICtrlSetData($StatusProgress, ($dlDone * 100 / $dlSize))
 	   $dlDoneOld = $dlDone
 	   Sleep(100)
@@ -125,7 +183,7 @@
 	   GUICtrlSetData($StatusProgress, 100)
 	   Return 1
 	Else
-	   _addStatusText($StatusEdit, 'Beim herunterladen von ' & $aUrl & ' ist folgender Fehler aufgetreten:' & @CRLF & InetGetInfo($download, 4)
+	   _addStatusText($StatusEdit, _getString('error', 'errDownload', _ArrayCreate($sUrl, @CRLF & InetGetInfo($download, 4))))
 	   Return 0
 	EndIf
  EndFunc
@@ -134,21 +192,21 @@
 	Local $WinError, $Label, $TextArea, $sNewFile, $sNewFilePath, $sFile, $sFilePath, $dlReturn = 1, $sUrl = "http://osm.pleiades.uni-wuppertal.de/openfietsmap/EU_2013/GPS/"   ; <------- Change if you want to try it
 	Local $WinCardSel, $i, $lvItem, $aItem
 	Local $aFiles, $aLvItems, $aLines, $aImages
-	_addStatusText($StatusEdit, 'Ermittle Datei-URLs')
+	_addStatusText($StatusEdit, _getString('info', 'infDetermineUrls'))
 	Local $bData = InetRead($sUrl)
 	Dim $aContent = StringRegExp(BinaryToString($bData), '(?i).*a\shref="([^"]*\.zip)".*<td[^>]*>([^<]*)</td><td[^<]*>[^<]*</td><td[^>]*><?b?>?([^<]*)<.*', 3)
 	For $i = 0 To UBound($aContent) - 1  Step 3
 	   _addElement($aLines, $aContent[$i] & '|' & $aContent[$i + 1] & '|' & $aContent[$i + 2])
 	Next
 	
-	$WinCardSel = GUICreate("Karten wählen", 500, 280, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX, -1, $WinMain)
-	GUICtrlCreateLabel("Folgende Karten wurden gefunden." & @CRLF & "Bitte auswählen, welche installiert werden sollen:", 5, 5)
-	Local $list = GUICtrlCreateListView("|Datei                     |Änderungsdatum|Beschreibung", 5, 5, 490, 230, $GUI_SS_DEFAULT_LISTVIEW + $LVS_NOSORTHEADER, $LVS_EX_CHECKBOXES)
+	$WinCardSel = GUICreate(_getString('title', 'ttlChooseCards'), 500, 280, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX, -1, $WinMain)
+	GUICtrlCreateLabel(_getString('useract', 'usrChooseCards', _ArrayCreate(@CRLF)), 5, 5)
+	Local $list = GUICtrlCreateListView(_getString('header', 'hdrChooseCards'), 5, 5, 490, 230, $GUI_SS_DEFAULT_LISTVIEW + $LVS_NOSORTHEADER, $LVS_EX_CHECKBOXES)
 	For $sLine In $aLines
 	   _addElement($aLvItems, GUICtrlCreateListViewItem('|' & $sLine, $list))
 	Next
-	Local $ChooseButton = GUICtrlCreateButton("Auswahl installieren", 110, 240, 105, 35)
-	Local $AllButton = GUICtrlCreateButton("Alle Installieren", 225, 240, 105, 35)
+	Local $ChooseButton = GUICtrlCreateButton(_getString('button', 'btnInstallChoice'), 110, 240, 105, 35)
+	Local $AllButton = GUICtrlCreateButton(_getString('button', 'btnInstallAll'), 225, 240, 105, 35)
 	GUISetState()
 	
 	While 1
@@ -169,35 +227,35 @@
 			 ExitLoop
 		  Case $GUI_EVENT_CLOSE
 			 GUIDelete($WinCardSel)
-			 _addStatusText($StatusEdit, 'Es wurden keine Karten zur Installation ausgewählt.')
+			 _addStatusText($StatusEdit, _getString('error', 'errMissingCards'))
 			 Return 1
 	   EndSwitch
 	WEnd
 	GUIDelete($WinCardSel)
 
-	_addStatusText($StatusEdit, 'Lade und installiere ' & UBound($aFiles) & ' Karte(n).')
+	_addStatusText($StatusEdit, _getString('info', 'infCountedCards', _ArrayCreate(UBound($aFiles))))
 	
 	if not IsArray($aFiles) Then
-	   $WinError = GUICreate("Error", 600, 800, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX)
-	   $Label = GUICtrlCreateLabel("Konnte Karten-URLs nicht ermitteln. " & @CRLF & "Gefundene URLs: " & UBound($aFiles), 5, 5)
+	   $WinError = GUICreate(_getString('error', 'ttlError'), 600, 800, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX)
+	   $Label = GUICtrlCreateLabel(_getString('error', 'errDeterminedCards', _ArrayCreate(@CRLF, UBound($aFiles))), 5, 5)
 	   $TextArea = GUICtrlCreateEdit(BinaryToString($bData), 5, 40, 590, 755, $ES_AUTOVSCROLL + $WS_VSCROLL + $ES_MULTILINE + $ES_READONLY)
 	   GUISetState()
 	   Return 1
     EndIf
 	For $sFile In $aFiles
 	   $sFilePath = @TempDir & '\' & $sFile
-	   If GUIGetMsg() == $EndButton Then
+	   If GUIGetMsg() == $EndButton Or GUIGetMsg() == $GUI_EVENT_CLOSE Then
 		  InetClose($download)
 		  FileDelete($sFilePath)
 		  GUICtrlSetData($StatusProgress, 0)
 		  GUICtrlSetData($StatusLabel, '')
-		  GUICtrlSetData($EndButton, 'Beenden')
+		  GUICtrlSetData($EndButton, _getString('button', 'btnClose'))
 		  Return 1
 	   EndIf
 	   $sNewFile = StringReplace(StringLower($sFile), '.zip', '.img')
 	   $sNewFilePath = @TempDir & '\' & $sNewFile
 	   If FileExists($sNewFilePath) Then
-		  If MsgBox(292, 'Karte existiert', 'Die Datei ' & $sNewFilePath & ' existiert bereits.' & @CRLF & 'Überschreiben?') == 6 Then
+		  If MsgBox(292, _getString('title', 'ttlExistingCard'), _getString('useract', 'usrOverwriteFile', _ArrayCreate($sNewFilePath, @CRLF))) == 6 Then
 			 $dlReturn = _loadFile($StatusEdit, $StatusProgress, $StatusLabel, $EndButton, $sUrl, $sFile)
 		  Else
 			 $dlReturn = 2
@@ -208,7 +266,7 @@
 	   
 	   If $dlReturn == 1 Then
 		  If _unzipFiles($StatusEdit, $EndButton, $sFilePath, $sNewFilePath) Then
-			 _addStatusText($StatusEdit, 'Lösche erfolgreich entpackte Datei ' & $sFilePath)
+			 _addStatusText($StatusEdit, _getString('info', 'infDeleteUnzipped', _ArrayCreate($sFilePath)))
 			 FileDelete($sFilePath)
 			 _addElement($aImages, $sNewFilePath)
 		  EndIf
@@ -217,30 +275,30 @@
 	   EndIf
     Next
 	GUICtrlSetData($StatusLabel, '')
-	GUICtrlSetData($EndButton, 'Beenden')
+	GUICtrlSetData($EndButton, _getString('button', 'btnClose'))
 	Return $aImages
  EndFunc
  
  Func _unzipFiles($StatusEdit, $EndButton, $sFilePath, $sNewFilePath)
 	Local $szDrive, $szDir, $szFName, $szExt, $aPath
-    GUICtrlSetData($EndButton, 'Entpacken stoppen')
+    GUICtrlSetData($EndButton, _getString('button', 'btnStopDecompression'))
 	If Not FileExists($sFilePath) Then
 	   Return 0
     EndIf
     If _Zip_ItemExists($sFilePath, 'garmin\gmapsupp.img') Then
-	   _addStatusText($StatusEdit, 'Entpacke ' & $sFilePath & ' nach ' & $sNewFilePath)
+	   _addStatusText($StatusEdit, _getString('info', 'infUnzipFile', _ArrayCreate($sFilePath, $sNewFilePath)))
 	   if _Zip_Unzip($sFilePath, 'garmin\gmapsupp.img', @TempDir, 513) Then
 		  If Not FileExists(@TempDir & '\gmapsupp.img') Then
-			 _addStatusText($StatusEdit, 'Die Datei ' & @TempDir & '\gmapsupp.img' & ' existiert nicht.')
+			 _addStatusText($StatusEdit, _getString('error', 'errMissingFile', @TempDir & '\gmapsupp.img'))
 			 Return 0
 		  EndIf
 		  If Not FileMove(@TempDir & '\gmapsupp.img', $sNewFilePath, 9) Then
-			 _addStatusText($StatusEdit, 'Fehler beim Verschieben der Datei ' & @TempDir & '\gmapsupp.img' & ' nach ' & $sNewFilePath)
+			 _addStatusText($StatusEdit, _getString('error', 'errMovingFile', _ArrayCreate(@TempDir & '\gmapsupp.img', $sNewFilePath)))
 			 Return 0
 		  EndIf
 		  Return 1
 	   Else
-		  _addStatusText($StatusEdit, 'Beim Entpacken von ' & $sFile & ' ist ein Fehler mit folgendem Code aufgetreten:' & @error)
+		  _addStatusText($StatusEdit, _getString('error', 'errUnzipFile', _ArrayCreate($sFile, @error)))
 		  Return 0
 	   EndIf
     EndIf
@@ -251,16 +309,16 @@
 	Local $aDrives = DriveGetDrive('REMOVABLE')
 
     If UBound($aDrives) > 0 Then
-	   $WinDriveSel = GUICreate("vorhandene Speichermedien", 500, 280, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX, -1, $WinMain)
+	   $WinDriveSel = GUICreate(_getString('title', 'ttlDeterminedDrives'), 500, 280, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX, -1, $WinMain)
 
-	   $list = GUICtrlCreateListView("Laufwerk  | Größe (GB) | Garmin-Gerät?  ", 5, 5, 490, 230)
-	   $ChooseButton = GUICtrlCreateButton("Auswahl bestätigen", 110, 240, 105, 35)
-	   $CancelButton = GUICtrlCreateButton("Abbrechen", 225, 240, 105, 35)
+	   $list = GUICtrlCreateListView(_getString('header', 'hdrChooseDrive'), 5, 5, 490, 230)
+	   $ChooseButton = GUICtrlCreateButton(_getString('button', 'btnConfirmChoice', 110, 240, 105, 35)
+	   $CancelButton = GUICtrlCreateButton(_getString('button', 'btnCancel'), 225, 240, 105, 35)
 	   for $sDrive in $aDrives
 		  If DriveStatus($sDrive) == 'READY' Then
 			 $lvItem = $sDrive & '|' & (DriveSpaceTotal($sDrive)/1024) & '|'
 			 If FileExists($sDrive & '\garmin') Then
-				$lvItem = $lvItem & 'yes'
+				$lvItem = $lvItem & _getString('header', 'hdrYes')
 			 EndIf
 			 GUICtrlCreateListViewItem($lvItem, $list)
 		  EndIf
@@ -274,19 +332,19 @@
 				GUIDelete($WinDriveSel)
 				Return $aDrive
 			 Case $CancelButton
-				_addStatusText($StatusEdit, 'Karten-Update wird abgebrochen, da kein valides Gerät ausgewählt wurde.')
+				_addStatusText($StatusEdit, _getString('error', 'errChoosenInvalidDrive'))
 				GUIDelete($WinDriveSel)
 				Return 0
 			 Case $GUI_EVENT_CLOSE
-				_addStatusText($StatusEdit, 'Karten-Update wird abgebrochen, da kein valides Gerät ausgewählt wurde.')
+				_addStatusText($StatusEdit, _getString('error', 'errChoosenInvalidDrive'))
 				GUIDelete($WinDriveSel)
 				Return 0
 		  EndSwitch
 	   WEnd
 	Else
 	   Do
-		  If MsgBox(5, 'Warte auf Speichermedium', 'Bitte das Navigationsgerät anschließen.') == 2 Then
-			 _addStatusText($StatusEdit, 'Karten-Update wird abgebrochen, da kein valides Gerät angeschlossen wurde.')
+		  If MsgBox(5, _getString('title', 'ttlWaitDrive'), _getString('useract', 'usrConnectNavi')) == 2 Then
+			 _addStatusText($StatusEdit, _getString('error', 'errMissingDrive'))
 			 Return 0
 		  EndIf
 	   Until UBound(DriveGetDrive('REMOVABLE')) > 0
@@ -296,13 +354,14 @@
 
  Func main()
     Local $WinMain, $StartButton, $StatusEdit, $StatusProgress, $StatusLabel, $EndButton, $aImages, $sImage, $sTargetDir, $aDrive
-	$WinMain = GUICreate('Kartenupdate-Tool', 400, 440, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX)
+	$WinMain = GUICreate(_getString('title', 'ttlMain'), 400, 440, -1, -1, $WS_MINIMIZEBOX + $WS_CAPTION + $WS_POPUP + $WS_SYSMENU + $WS_SIZEBOX)
     $StatusEdit = GUICtrlCreateEdit('', 5, 5, 390, 330, $ES_READONLY + $ES_MULTILINE + $ES_AUTOVSCROLL + $WS_VSCROLL)
 	$StatusProgress = GUICtrlCreateProgress(5, 335, 390, 20, $PBS_SMOOTH)
 	$StatusLabel = GUICtrlCreateLabel('', 5, 360, 390, 35)
-	$StartButton = GUICtrlCreateButton('Update starten', 110, 400, 105, 35)
-	$EndButton = GUICtrlCreateButton('Beenden', 225, 400, 105, 35)
+	$StartButton = GUICtrlCreateButton(_getString('button', 'btnStartUpdate'), 110, 400, 105, 35)
+	$EndButton = GUICtrlCreateButton(_getString('button', 'btnClose'), 225, 400, 105, 35)
 	GUISetState()
+	_addStatusText($StatusEdit, _getString('info', 'infDeterminedLang', _ArrayCreate(_getLanguage())))
 	While 1
 		Switch GUIGetMsg()
 			 Case $GUI_EVENT_CLOSE
@@ -310,7 +369,7 @@
 			 Case $StartButton
 				While Not _isInternetConnected()
 				   GUISetState(@SW_DISABLE, $WinMain)
-				   Switch MsgBox( 6, "keine Internetverbindung", "Der Rechner scheint keine Netzwerkverbindung zu haben. Bitte zu erst ein Verbindung herstellen.")
+				   Switch MsgBox( 6, _getString('title', 'ttlConnectInet'), _getString('error', 'errConnectInet'))
 					  Case 2
 						 Exit
 					  Case 11
@@ -319,29 +378,31 @@
 			    WEnd
 				GUISetState(@SW_ENABLE, $WinMain)
 				GUISetState(@SW_SHOWNORMAL, $WinMain)
+				GUICtrlSetState($StartButton, $GUI_DISABLE)
 				$aImages = _getFiles($WinMain, $StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
 				If IsArray($aImages) And UBound($aImages) > 0 Then
 				   $aDrive = _getDrive($WinMain, $StatusEdit)
 				   If IsArray($aDrive) And UBound($aDrive) > 0 Then
-					  If $aDrive[3] == 'yes' Then
-						 _addStatusText($StatusEdit, 'Ausgewähltes Laufwerk wurde als Garmin-Gerät erkannt.' & @CRLF & '  Nutze Standard-Ordner "garmin" als Ziel.')
+					  If $aDrive[3] == _getString('header', 'hdrYes') Then
+						 _addStatusText($StatusEdit, _getString('info', 'infFoundGarmin', _ArrayCreate(@CRLF)))
 						 $sTargetDir = $aDrive[1] & '\garmin\'
 					  Else
-						 $sTargetDir = FileSelectFolder('Bitte Zielpfad auf dem Laufwerk auswählen.', $aDrive[1])
+						 $sTargetDir = FileSelectFolder(_getString('useract', 'usrTargetPath'), $aDrive[1])
 					  EndIf
 					  For $sImage In $aImages
 						 If Not $sImage Then ContinueLoop
 ;~ 						 $sFileSize = FileGetSize($sImage)
 ;~ 						 $sTarget
-						 _addStatusText($StatusEdit, 'Verschiebe ' & $sImage & ' nach ' & $sTargetDir)
+						 _addStatusText($StatusEdit, _getString('info', 'infMoveImage', _ArrayCreate($sImage, $sTargetDir)))
 						 _moveFile($sImage, $sTargetDir)
 ;~ 						 If $sFileSize == 
 ;~ 							_addStatusText($StatusEdit, 'Fehler beim Verschieben der Karte auf das Gerät. Fehler-Code: ' & @error)
 ;~ 						 EndIf
 					  Next
-					  _addStatusText($StatusEdit, 'Kartenupdate abgeschlossen.')
+					  _addStatusText($StatusEdit, _getString('info', 'infFinishedUpdate'))
 				   EndIf
 			    EndIf
+				GUICtrlSetState($StartButton, $GUI_ENABLE)
 			 Case $EndButton
 				ExitLoop
 		EndSwitch
