@@ -98,7 +98,6 @@
 		   Return 0
 	   Case StringInStr("0409 0809 0c09 1009 1409 1809 1c09 2009 2409 2809 2c09 3009 3409", @OSLang)
 		   ; English
-		   Return "deu"
 		   Return "eng"
 	   Case StringInStr("040c 080c 0c0c 100c 140c 180c", @OSLang)
 		   ; French
