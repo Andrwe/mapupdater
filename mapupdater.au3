@@ -92,7 +92,8 @@
 ; Example........:
 ; ===============================================================================================================
  Func _getLanguage()
-    Select
+    If _getConfig('general', 'LANG', '') Then Return _getConfig('general', 'LANG', '')
+	Select
 	   Case StringInStr("0413 0813", @OSLang)
 		   ; Dutch
 		   Return 0
@@ -138,6 +139,17 @@
  
  Func _getString($sSection, $sKey, $aReplaces = '')
 	Return _generateString(IniRead(@ScriptDir & '\lang.ini', $sSection & '/' & _getLanguage(), $sKey, IniRead(@ScriptDir & '\lang.ini', $sSection & '/eng', $sKey, '')), $aReplaces)
+ EndFunc
+ 
+ Func _getConfig($sSection, $sKey, $sDefault)
+	Local $sFile
+	If FileExists(@ScriptDir & '\mapupdater.ini') Then
+	   $sFile = @ScriptDir & '\mapupdater.ini'
+	EndIf
+	If FileExists(@UserProfileDir & '\mapupdater.ini') Then
+	   $sFile = @UserProfileDir & '\mapupdater.ini'
+	EndIf
+	Return IniRead($sFile, $sSection, $sKey, $sDefault)
  EndFunc
  
  Func _addStatusText($StatusEdit, $sText)
@@ -188,12 +200,13 @@
  EndFunc
  
  Func _getFiles($WinMain, $StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
-	Local $WinError, $Label, $TextArea, $sNewFile, $sNewFilePath, $sFile, $sFilePath, $dlReturn = 1, $sUrl = "http://osm.pleiades.uni-wuppertal.de/openfietsmap/EU_2013/GPS/"   ; <------- Change if you want to try it
+	Local $WinError, $Label, $TextArea, $sNewFile, $sNewFilePath, $sFile, $sFilePath, $dlReturn = 1
+	Local $sUrl = _getConfig('general', 'URL', 'http://osm.pleiades.uni-wuppertal.de/openfietsmap/EU_2013/GPS/')
 	Local $WinCardSel, $i, $lvItem, $aItem
 	Local $aFiles, $aLvItems, $aLines, $aImages
 	_addStatusText($StatusEdit, _getString('info', 'infDetermineUrls'))
 	Local $bData = InetRead($sUrl)
-	Dim $aContent = StringRegExp(BinaryToString($bData), '(?i).*a\shref="([^"]*\.zip)".*<td[^>]*>([^<]*)</td><td[^<]*>[^<]*</td><td[^>]*><?b?>?([^<]*)<.*', 3)
+	Dim $aContent = StringRegExp(BinaryToString($bData), _getConfig('advanced', 'LINK_REGEXP', '(?i).*a\shref="([^"]*\.zip)".*<td[^>]*>([^<]*)</td><td[^<]*>[^<]*</td><td[^>]*><?b?>?([^<]*)<.*'), 3)
 	For $i = 0 To UBound($aContent) - 1  Step 3
 	   _addElement($aLines, $aContent[$i] & '|' & $aContent[$i + 1] & '|' & $aContent[$i + 2])
 	Next
