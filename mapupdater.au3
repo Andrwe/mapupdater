@@ -201,7 +201,7 @@
  
  Func _getFiles($WinMain, $StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
 	Local $WinError, $Label, $TextArea, $sNewFile, $sNewFilePath, $sFile, $sFilePath, $dlReturn = 1
-	Local $sUrl = _getConfig('general', 'URL', 'http://osm.pleiades.uni-wuppertal.de/openfietsmap/EU_2013/GPS/')
+	Local $sUrl = _getConfig('advanced', 'URL', 'http://osm.pleiades.uni-wuppertal.de/openfietsmap/EU_2013/GPS/')
 	Local $WinCardSel, $i, $lvItem, $aItem
 	Local $aFiles, $aLvItems, $aLines, $aImages
 	_addStatusText($StatusEdit, _getString('info', 'infDetermineUrls'))
@@ -223,6 +223,10 @@
 	
 	While 1
 	   Switch GUIGetMsg()
+		  Case $GUI_EVENT_CLOSE
+			 GUIDelete($WinCardSel)
+			 _addStatusText($StatusEdit, _getString('error', 'errMissingCards'))
+			 Return 1
 		  Case $ChooseButton
 			 For $lvItem In $aLvItems
 				If BitAnd(GUICtrlRead($lvItem, 1),$GUI_CHECKED) Then
@@ -237,10 +241,6 @@
 				_addElement($aFiles, $aItem[2])
 			 Next
 			 ExitLoop
-		  Case $GUI_EVENT_CLOSE
-			 GUIDelete($WinCardSel)
-			 _addStatusText($StatusEdit, _getString('error', 'errMissingCards'))
-			 Return 1
 	   EndSwitch
 	WEnd
 	GUIDelete($WinCardSel)
@@ -277,7 +277,7 @@
 	   EndIf
 	   
 	   If $dlReturn == 1 Then
-		  If _unzipFiles($StatusEdit, $EndButton, $sFilePath, $sNewFilePath) Then
+		  If _unzipFile($StatusEdit, $EndButton, $sFilePath, $sNewFilePath) Then
 			 _addStatusText($StatusEdit, _getString('info', 'infDeleteUnzipped', _ArrayCreate($sFilePath)))
 			 FileDelete($sFilePath)
 			 _addElement($aImages, $sNewFilePath)
@@ -291,7 +291,7 @@
 	Return $aImages
  EndFunc
  
- Func _unzipFiles($StatusEdit, $EndButton, $sFilePath, $sNewFilePath)
+ Func _unzipFile($StatusEdit, $EndButton, $sFilePath, $sNewFilePath)
 	Local $szDrive, $szDir, $szFName, $szExt, $aPath
     GUICtrlSetData($EndButton, _getString('button', 'btnStopDecompression'))
 	If Not FileExists($sFilePath) Then
@@ -362,6 +362,15 @@
 	   Until UBound(DriveGetDrive('REMOVABLE')) > 0
 	   Return _getDrive($WinMain, $StatusEdit)
     EndIf
+ EndFunc
+
+ Func _checkUpdate($StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
+	_addStatusText($StatusEdit, _getString('info', 'infCheckingUpdate')
+	Local $bData = InetRead('http://andrwe.org/')
+	Dim $aContent = StringRegExp(BinaryToString($bData), , 3)
+	For $i = 0 To UBound($aContent) - 1  Step 3
+	   _addElement($aLines, $aContent[$i] & '|' & $aContent[$i + 1] & '|' & $aContent[$i + 2])
+	Next
  EndFunc
 
  Func main()
