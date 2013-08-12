@@ -3,7 +3,7 @@
 ;
 ; Description:      Download and install maps created by openfietsmap.nl
 ; Author:           Andrwe Lord Weber
-; Date:             2013-07-07
+; Date:             2013-08-12
 ; Licence:          Creative Common Attribution-ShareAlike 3.0 Unported (http://creativecommons.org/licenses/by-sa/3.0/)
 ; Credits:          (_Zip.au3) PsaltyDS for the original idea on which this UDF is based.
 ;                   (_Zip.au3) torels for the basic framework on which this UDF is based.
@@ -21,6 +21,8 @@
 ;   copied to.
 ;
 ; ===============================================================================================================
+
+Const $VERSION = '0.0.1'
 
 #include <GUIConstantsEx.au3>
 #include <WindowsConstants.au3>
@@ -138,7 +140,7 @@
  EndFunc
  
  Func _getString($sSection, $sKey, $aReplaces = '')
-	Return _generateString(IniRead(@ScriptDir & '\lang.ini', $sSection & '/' & _getLanguage(), $sKey, IniRead(@ScriptDir & '\lang.ini', $sSection & '/eng', $sKey, '')), $aReplaces)
+	Return _generateString(IniRead(@ScriptDir & '\lang.ini', $sSection & '/' & _getLanguage(), $sKey, IniRead(@ScriptDir & '\lang.ini', $sSection & '/eng', $sKey, 'Could not find ' & $sKey & ' in your or default language')), $aReplaces)
  EndFunc
  
  Func _getConfig($sSection, $sKey, $sDefault)
@@ -164,14 +166,16 @@
 	   EndIf
  EndFunc
  
- Func _loadFile($StatusEdit, $StatusProgress, $StatusLabel, $EndButton, $sUrl, $sFile)
+ Func _loadFile($StatusEdit, $StatusProgress, $StatusLabel, $EndButton, $sUrl, $sFile, $force = 0)
 	Local $download, $dlSize = 2000000000, $dlDone = 0, $dlDoneOld = 0, $dlRate = 1, $dlRateOld
 	GUICtrlSetData($EndButton, _getString('button', 'btnStopDownload'))
     GUICtrlSetData($StatusProgress, 1)
 	$sUrl = $sUrl & $sFile
-	_addStatusText($StatusEdit, _getString('info', 'infDownloadFile', _ArrayCreate($sUrl, @TempDir)))
-	$download = InetGet($sUrl, @TempDir & "\" & $sFile, 2, 1)
-	$dlSize = InetGetSize($sUrl, 2)
+	_addStatusText($StatusEdit, _getString('info', 'infDownloadFile', _ArrayCreate($sUrl, @TempDir & '\' & $sFile)))
+	$dlSize = InetGetSize($sUrl, 2 + $force)
+	$download = InetGet($sUrl, @TempDir & '\' & $sFile, 2 + $force, 1)
+	Local $err = InetGetInfo($download)
+	_ArrayDisplay($err)
 	Do
 	   If GUIGetMsg() == $EndButton Or GUIGetMsg() == $GUI_EVENT_CLOSE Then
 		  InetClose($download)
@@ -192,9 +196,23 @@
 	Until InetGetInfo($download, 2)
 	If InetGetInfo($download, 3) Then
 	   GUICtrlSetData($StatusProgress, 100)
+	   InetClose($download)
 	   Return 1
 	Else
-	   _addStatusText($StatusEdit, _getString('error', 'errDownload', _ArrayCreate($sUrl, @CRLF & InetGetInfo($download, 4))))
+	   Local $err = InetGetInfo($download)
+; known error-codes:
+;  13 - file doesn't exist
+;  31 - 
+	   If $err[4] == 13 Then
+		  _addStatusText($StatusEdit, _getString('error', 'errDownload', _ArrayCreate($sUrl, @CRLF & '   ' & _getString('error', 'errMissingFile', _ArrayCreate('')))))
+	   Else
+		  _ArrayDisplay($err)
+		  _addStatusText($StatusEdit, _getString('error', 'errDownload', _ArrayCreate($sUrl, 'Error-Code: ' & $err & ' + ' & InetGetInfo($download, 5))))
+	   EndIf
+	   InetClose($download)
+	   GUICtrlSetData($StatusProgress, 0)
+	   GUICtrlSetData($StatusLabel, '')
+	   GUICtrlSetData($EndButton, _getString('button', 'btnClose'))
 	   Return 0
 	EndIf
  EndFunc
@@ -291,23 +309,32 @@
 	Return $aImages
  EndFunc
  
- Func _unzipFile($StatusEdit, $EndButton, $sFilePath, $sNewFilePath)
+ Func _unzipFile($StatusEdit, $EndButton, $sFilePath, $sNewFilePath, $bCard = 1)
 	Local $szDrive, $szDir, $szFName, $szExt, $aPath
     GUICtrlSetData($EndButton, _getString('button', 'btnStopDecompression'))
 	If Not FileExists($sFilePath) Then
 	   Return 0
     EndIf
-    If _Zip_ItemExists($sFilePath, 'garmin\gmapsupp.img') Then
-	   _addStatusText($StatusEdit, _getString('info', 'infUnzipFile', _ArrayCreate($sFilePath, $sNewFilePath)))
-	   if _Zip_Unzip($sFilePath, 'garmin\gmapsupp.img', @TempDir, 513) Then
-		  If Not FileExists(@TempDir & '\gmapsupp.img') Then
-			 _addStatusText($StatusEdit, _getString('error', 'errMissingFile', @TempDir & '\gmapsupp.img'))
+	If $bCard Then
+	   If _Zip_ItemExists($sFilePath, 'garmin\gmapsupp.img') Then
+		  _addStatusText($StatusEdit, _getString('info', 'infUnzipFile', _ArrayCreate($sFilePath, $sNewFilePath)))
+		  if _Zip_Unzip($sFilePath, 'garmin\gmapsupp.img', @TempDir, 513) Then
+			 If Not FileExists(@TempDir & '\gmapsupp.img') Then
+				_addStatusText($StatusEdit, _getString('error', 'errMissingFile', @TempDir & '\gmapsupp.img'))
+				Return 0
+			 EndIf
+			 If Not FileMove(@TempDir & '\gmapsupp.img', $sNewFilePath, 9) Then
+				_addStatusText($StatusEdit, _getString('error', 'errMovingFile', _ArrayCreate(@TempDir & '\gmapsupp.img', $sNewFilePath)))
+				Return 0
+			 EndIf
+			 Return 1
+		  Else
+			 _addStatusText($StatusEdit, _getString('error', 'errUnzipFile', _ArrayCreate($sFile, @error)))
 			 Return 0
 		  EndIf
-		  If Not FileMove(@TempDir & '\gmapsupp.img', $sNewFilePath, 9) Then
-			 _addStatusText($StatusEdit, _getString('error', 'errMovingFile', _ArrayCreate(@TempDir & '\gmapsupp.img', $sNewFilePath)))
-			 Return 0
-		  EndIf
+	   EndIf
+	Else
+	   if _Zip_Unzip($sFilePath, '', $sNewFilePath, 513) Then
 		  Return 1
 	   Else
 		  _addStatusText($StatusEdit, _getString('error', 'errUnzipFile', _ArrayCreate($sFile, @error)))
@@ -365,12 +392,20 @@
  EndFunc
 
  Func _checkUpdate($StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
-	_addStatusText($StatusEdit, _getString('info', 'infCheckingUpdate')
-	Local $bData = InetRead('http://andrwe.org/')
-	Dim $aContent = StringRegExp(BinaryToString($bData), , 3)
-	For $i = 0 To UBound($aContent) - 1  Step 3
-	   _addElement($aLines, $aContent[$i] & '|' & $aContent[$i + 1] & '|' & $aContent[$i + 2])
-	Next
+	_addStatusText($StatusEdit, _getString('info', 'infCheckingUpdate'))
+	Local $bData = InetRead('http://andrwe.org/mapupdater/version.txt', 1)
+	Dim $aContent = StringRegExp(BinaryToString($bData), '^.*\s', 1)
+	If $aContent[0] <> $VERSION Then
+	   _addStatusText($StatusEdit, _getString('info', 'infFoundUpdate', _ArrayCreate($aContent[0], $VERSION, @CRLF)))
+	   If MsgBox(36, _getString('title', 'ttlInstallUpdate'), _getString('useract', 'usrInstallUpdate')) == 7 Then
+		  Return 0
+	   EndIf
+	   If _loadFile($StatusEdit, $StatusProgress, $StatusLabel, $EndButton, 'http://andrwe.org/mapupdater/', 'mapupdater-' & $aContent[0] & '.zip', 1) Then
+		  _unzipFile($StatusEdit, $EndButton, @TempDir & '/mapupdater-' & $aContent[0] & '.zip', @ScriptDir, 0)
+	   EndIf
+	Else
+	   _addStatusText($StatusEdit, _getString('info', 'infNoUpdate'))
+	EndIf
  EndFunc
 
  Func main()
@@ -383,6 +418,7 @@
 	$EndButton = GUICtrlCreateButton(_getString('button', 'btnClose'), 225, 400, 105, 35)
 	GUISetState()
 	_addStatusText($StatusEdit, _getString('info', 'infDeterminedLang', _ArrayCreate(_getLanguage())))
+	_checkUpdate($StatusEdit, $StatusProgress, $StatusLabel, $EndButton)
 	While 1
 		Switch GUIGetMsg()
 			 Case $GUI_EVENT_CLOSE
